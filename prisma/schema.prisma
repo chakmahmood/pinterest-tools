@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PinStatus {
+  DRAFT
+  READY
+  EXPORTED
+  ARCHIVED
+}
+
+model Post {
+  id                  String   @id @default(cuid())
+
+  url                 String   @unique
+  title               String
+
+  mainKeyword         String?
+  annotationKeyword   String?
+
+  pins                Pin[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Pin {
+  id          String      @id @default(cuid())
+
+  postId      String
+  post        Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String      @db.Text
+
+  imageUrl    String
+  board       String?
+
+  status      PinStatus   @default(DRAFT)
+
+  exportedAt  DateTime?
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([postId])
+  @@index([status])
+}
