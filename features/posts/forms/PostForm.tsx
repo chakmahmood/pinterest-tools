@@ -1,7 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -12,18 +11,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 interface PostFormProps {
+  defaultValues?: Partial<PostFormValues>;
+  submitLabel?: string;
+  onSubmit: (values: PostFormValues) => Promise<void>;
   onSuccess?: () => void;
 }
 
-export default function PostForm({ onSuccess }: PostFormProps) {
-  const router = useRouter();
+export default function PostForm({
+  defaultValues,
+  submitLabel = "Save Post",
+  onSubmit,
+  onSuccess,
+}: PostFormProps) {
   const [isPending, startTransition] = useTransition();
+  const [serverError, setServerError] = useState("");
 
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<PostFormValues>({
     resolver: zodResolver(postSchema),
     defaultValues: {
@@ -31,43 +38,38 @@ export default function PostForm({ onSuccess }: PostFormProps) {
       title: "",
       mainKeyword: "",
       annotationKeywords: "",
+      ...defaultValues,
     },
   });
 
-  function onSubmit(values: PostFormValues) {
+  function handleFormSubmit(values: PostFormValues) {
+    setServerError("");
+
     startTransition(async () => {
       try {
-        const response = await fetch("/api/posts", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(values),
-        });
+        await onSubmit(values);
 
-        const result = await response.json();
+        reset(values);
 
-        if (!response.ok) {
-          console.error(result);
-          alert(result.message ?? "Failed to create post.");
-          return;
-        }
-
-        reset();
         onSuccess?.();
-
-        // Refresh Server Component
-        router.refresh();
       } catch (error) {
-        console.error(error);
-        alert("Something went wrong.");
+        if (error instanceof Error) {
+          setServerError(error.message);
+        } else {
+          setServerError("Something went wrong.");
+        }
       }
     });
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      {/* URL */}
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
+      {serverError && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          {serverError}
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="url">Article URL</Label>
 
@@ -78,11 +80,10 @@ export default function PostForm({ onSuccess }: PostFormProps) {
         />
 
         {errors.url && (
-          <p className="text-sm text-red-500">{errors.url.message}</p>
+          <p className="text-sm text-destructive">{errors.url.message}</p>
         )}
       </div>
 
-      {/* Title */}
       <div className="space-y-2">
         <Label htmlFor="title">Title</Label>
 
@@ -93,11 +94,10 @@ export default function PostForm({ onSuccess }: PostFormProps) {
         />
 
         {errors.title && (
-          <p className="text-sm text-red-500">{errors.title.message}</p>
+          <p className="text-sm text-destructive">{errors.title.message}</p>
         )}
       </div>
 
-      {/* Main Keyword */}
       <div className="space-y-2">
         <Label htmlFor="mainKeyword">Main Keyword</Label>
 
@@ -108,11 +108,12 @@ export default function PostForm({ onSuccess }: PostFormProps) {
         />
 
         {errors.mainKeyword && (
-          <p className="text-sm text-red-500">{errors.mainKeyword.message}</p>
+          <p className="text-sm text-destructive">
+            {errors.mainKeyword.message}
+          </p>
         )}
       </div>
 
-      {/* Annotation Keywords */}
       <div className="space-y-2">
         <Label htmlFor="annotationKeywords">Annotation Keywords</Label>
 
@@ -127,14 +128,14 @@ export default function PostForm({ onSuccess }: PostFormProps) {
         </p>
 
         {errors.annotationKeywords && (
-          <p className="text-sm text-red-500">
+          <p className="text-sm text-destructive">
             {errors.annotationKeywords.message}
           </p>
         )}
       </div>
 
-      <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "Saving..." : "Save Post"}
+      <Button type="submit" className="w-full" disabled={isPending || !isDirty}>
+        {isPending ? "Saving..." : submitLabel}
       </Button>
     </form>
   );

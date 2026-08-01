@@ -1,15 +1,10 @@
 import { prisma } from "@/lib/prisma";
 
-export interface GetPostsParams {
-  search?: string;
-}
-
-export interface CreatePostInput {
-  url: string;
-  title: string;
-  mainKeyword?: string;
-  annotationKeywords: string[];
-}
+import type {
+  CreatePostInput,
+  GetPostsParams,
+  UpdatePostInput,
+} from "../types";
 
 export async function getPosts(params?: GetPostsParams) {
   const search = params?.search?.trim();
@@ -36,6 +31,11 @@ export async function getPosts(params?: GetPostsParams) {
                 mode: "insensitive",
               },
             },
+            {
+              annotationKeywords: {
+                has: search,
+              },
+            },
           ],
         }
       : undefined,
@@ -49,8 +49,55 @@ export async function getPosts(params?: GetPostsParams) {
     },
 
     orderBy: {
-      createdAt: "desc",
+      updatedAt: "desc",
     },
+
+    skip: params?.skip,
+    take: params?.take,
+  });
+}
+
+export async function getPostByUrl(url: string) {
+  return prisma.post.findUnique({
+    where: {
+      url,
+    },
+  });
+}
+
+export async function countPosts(search?: string) {
+  const keyword = search?.trim();
+
+  return prisma.post.count({
+    where: keyword
+      ? {
+          OR: [
+            {
+              title: {
+                contains: keyword,
+                mode: "insensitive",
+              },
+            },
+            {
+              url: {
+                contains: keyword,
+                mode: "insensitive",
+              },
+            },
+            {
+              mainKeyword: {
+                contains: keyword,
+                mode: "insensitive",
+              },
+            },
+            {
+              annotationKeywords: {
+                has: keyword,
+              },
+            },
+          ],
+        }
+      : undefined,
   });
 }
 
@@ -61,7 +108,17 @@ export async function getPostById(id: string) {
     },
 
     include: {
-      pins: true,
+      pins: {
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
+
+      _count: {
+        select: {
+          pins: true,
+        },
+      },
     },
   });
 }
@@ -72,21 +129,13 @@ export async function createPost(data: CreatePostInput) {
   });
 }
 
-export async function updatePost(
-  id: string,
-  data: {
-    url: string;
-    title: string;
-    mainKeyword?: string;
-    annotationKeywords?: string[];
-  },
-) {
+export async function updatePost(id: string, data: UpdatePostInput) {
   return prisma.post.update({
-    where: { id },
-    data: {
-      ...data,
-      annotationKeywords: data.annotationKeywords ?? [],
+    where: {
+      id,
     },
+
+    data,
   });
 }
 
