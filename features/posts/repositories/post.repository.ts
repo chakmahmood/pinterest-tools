@@ -4,6 +4,13 @@ export interface GetPostsParams {
   search?: string;
 }
 
+export interface CreatePostInput {
+  url: string;
+  title: string;
+  mainKeyword?: string;
+  annotationKeywords: string[];
+}
+
 export async function getPosts(params?: GetPostsParams) {
   const search = params?.search?.trim();
 
@@ -59,17 +66,9 @@ export async function getPostById(id: string) {
   });
 }
 
-export async function createPost(data: {
-  url: string;
-  title: string;
-  mainKeyword?: string;
-  annotationKeywords?: string[];
-}) {
+export async function createPost(data: CreatePostInput) {
   return prisma.post.create({
-    data: {
-      ...data,
-      annotationKeywords: data.annotationKeywords ?? [],
-    },
+    data,
   });
 }
 
