@@ -20,7 +20,7 @@ model Post {
   title               String
 
   mainKeyword         String?
-  annotationKeyword   String?
+  annotationKeywords  String[]
 
   pins                Pin[]
 
