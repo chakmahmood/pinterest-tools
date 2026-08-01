@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import type { PostWithPinCount } from "../types";
 
@@ -38,15 +39,19 @@ export default function DeletePostDialog({ post, open, onOpenChange }: Props) {
       const result = await response.json();
 
       if (!response.ok) {
-        alert(result.message ?? "Failed to delete post.");
+        toast.error(result.message ?? "Failed to delete post.");
         return;
       }
 
-      router.refresh();
+      toast.success("Post deleted successfully.");
+
       onOpenChange(false);
+
+      router.refresh();
     } catch (error) {
       console.error(error);
-      alert("Something went wrong.");
+
+      toast.error("Something went wrong.");
     } finally {
       setIsDeleting(false);
     }
@@ -64,7 +69,7 @@ export default function DeletePostDialog({ post, open, onOpenChange }: Props) {
         <div className="rounded-lg border bg-muted/40 p-4">
           <p className="font-medium">{post.title}</p>
 
-          <p className="mt-1 text-sm text-muted-foreground truncate">
+          <p className="mt-1 truncate text-sm text-muted-foreground">
             {post.url}
           </p>
         </div>

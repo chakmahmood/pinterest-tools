@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { toast } from "sonner";
+
 import type { PostWithPinCount } from "../types";
+import type { PostFormValues } from "../schemas/post.schema";
 
 import PostForm from "../forms/PostForm";
 
@@ -22,14 +25,10 @@ interface Props {
 
 export default function EditPostDialog({ post, open, onOpenChange }: Props) {
   const router = useRouter();
+
   const [isSaving, setIsSaving] = useState(false);
 
-  async function handleSubmit(values: {
-    url: string;
-    title: string;
-    mainKeyword?: string;
-    annotationKeywords: string;
-  }) {
+  async function handleSubmit(values: PostFormValues) {
     try {
       setIsSaving(true);
 
@@ -44,15 +43,27 @@ export default function EditPostDialog({ post, open, onOpenChange }: Props) {
       const result = await response.json();
 
       if (!response.ok) {
-        alert(result.message ?? "Failed to update post.");
+        toast.error("Failed to update post.", {
+          description:
+            result.message ?? "Please check your data and try again.",
+        });
+
         return;
       }
 
-      router.refresh();
+      toast.success("Post updated successfully.", {
+        description: values.title,
+      });
+
       onOpenChange(false);
+
+      router.refresh();
     } catch (error) {
       console.error(error);
-      alert("Something went wrong.");
+
+      toast.error("Something went wrong.", {
+        description: "Unable to update post.",
+      });
     } finally {
       setIsSaving(false);
     }

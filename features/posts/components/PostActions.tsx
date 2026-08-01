@@ -11,6 +11,8 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { toast } from "sonner";
+
 import type { PostWithPinCount } from "../types";
 
 import EditPostDialog from "../dialogs/EditPostDialog";
@@ -32,16 +34,50 @@ export default function PostActions({ post }: Props) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  async function handleCopyPrompt() {
+    try {
+      const response = await fetch(`/api/posts/${post.id}/prompt`);
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        toast.error("Failed to generate prompt.", {
+          description: result.message ?? "Please try again.",
+        });
+
+        return;
+      }
+
+      await navigator.clipboard.writeText(result.prompt);
+
+      toast.success("AI Prompt copied!", {
+        description: "Ready to paste into your AI generator.",
+      });
+    } catch (error) {
+      console.error(error);
+
+      toast.error("Something went wrong.", {
+        description: "Failed to copy AI prompt.",
+      });
+    }
+  }
+
   function handleDuplicate() {
-    console.log("Duplicate", post.id);
+    toast.info("Duplicate feature coming soon.", {
+      description: `Post: ${post.title}`,
+    });
   }
 
   function handleGeneratePins() {
-    console.log("Generate Pins", post.id);
+    toast.info("Generate Pins feature coming soon.", {
+      description: `Generating pins for: ${post.title}`,
+    });
   }
 
   function handleExport() {
-    console.log("Export CSV", post.id);
+    toast.info("Export CSV feature coming soon.", {
+      description: `Exporting: ${post.title}`,
+    });
   }
 
   return (
@@ -68,7 +104,7 @@ export default function PostActions({ post }: Props) {
           <MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuItem onClick={() => setEditOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
             Edit
@@ -80,6 +116,11 @@ export default function PostActions({ post }: Props) {
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
+
+          <DropdownMenuItem onClick={handleCopyPrompt}>
+            <Copy className="mr-2 h-4 w-4" />
+            Copy AI Prompt
+          </DropdownMenuItem>
 
           <DropdownMenuItem onClick={handleGeneratePins}>
             <Sparkles className="mr-2 h-4 w-4" />
@@ -104,6 +145,7 @@ export default function PostActions({ post }: Props) {
       </DropdownMenu>
 
       <EditPostDialog post={post} open={editOpen} onOpenChange={setEditOpen} />
+
       <DeletePostDialog
         post={post}
         open={deleteOpen}
