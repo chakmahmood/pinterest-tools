@@ -13,7 +13,7 @@ export const pinSchema = z.object({
 
   board: z.string().optional().nullable(),
 
-  keywords: z.array(z.string()).default([]),
+  keywords: z.string().default(""),
 });
 
 export type PinFormValues = z.infer<typeof pinSchema>;

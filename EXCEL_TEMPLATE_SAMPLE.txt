@@ -1,0 +1,122 @@
+**Pinterest Pins Import Template - Sample Data**
+
+COPY THIS DATA INTO EXCEL:
+
+Column Headers (Row 1):
+postUrl | title | description | imagePrompt | overlayText | imageUrl | board | keywords
+
+Sample Data (Replace these with your actual URLs and data):
+https://example.com/post-1 | Modern Sofa Collection | Discover beautiful modern sofa designs perfect for contemporary living spaces with sleek lines and comfort | A minimalist modern sofa with gray upholstery in a bright living room with natural lighting | Sale 30% | | Living Room | furniture,modern,interior
+https://example.com/post-2 | Kitchen Organization Ideas | Learn professional kitchen organization tips and tricks to maximize storage and create an efficient cooking space | Modern kitchen with white cabinets stainless steel appliances and organized pantry system | New Collection | | Kitchen | organization,storage,design
+https://example.com/post-3 | Bedroom Decor Inspiration | Transform your bedroom with cozy and elegant decoration ideas featuring warm colors and comfortable furnishings | Cozy bedroom with soft lighting warm wood furniture and decorative wall art creating a relaxing atmosphere | | | Bedroom | decoration,cozy,bedroom
+
+---
+
+COLUMN DEFINITIONS:
+
+1. postUrl (REQUIRED)
+   - Description: URL of the Post this Pin belongs to
+   - Example: https://example.com/posts/furniture-tips
+   - Rule: Must exactly match a Post URL in your database
+   - Type: Text/URL
+
+2. title (REQUIRED, min 3 characters)
+   - Description: Pin title/name
+   - Example: Modern Living Room Furniture
+   - Rule: Minimum 3 characters
+   - Type: Text
+
+3. description (REQUIRED, min 10 characters)
+   - Description: Detailed description of the pin
+   - Example: Explore modern design ideas for living room with contemporary furniture and minimalist décor
+   - Rule: Minimum 10 characters
+   - Type: Long Text
+
+4. imagePrompt (REQUIRED, min 10 characters)
+   - Description: Prompt for AI image generation
+   - Example: A bright minimalist living room with grey sofa and natural lighting scandinavian interior design
+   - Rule: Minimum 10 characters, descriptive and detailed
+   - Type: Long Text
+
+5. overlayText (OPTIONAL)
+   - Description: Text to display over the image
+   - Example: Limited Sale, New Arrival, Save 50%
+   - Rule: Can be empty
+   - Type: Text
+
+6. imageUrl (OPTIONAL)
+   - Description: URL of an existing image
+   - Example: https://cdn.example.com/sofa-image.jpg
+   - Rule: Can be empty, system will generate from imagePrompt if not provided
+   - Type: URL
+
+7. board (OPTIONAL)
+   - Description: Pinterest board name
+   - Example: Home Decor, Living Room, Furniture
+   - Rule: Can be empty
+   - Type: Text
+
+8. keywords (OPTIONAL)
+   - Description: Comma-separated keywords
+   - Example: furniture, design, modern, interior, home decor
+   - Rule: Separate multiple keywords with comma and space
+   - Type: Text
+
+---
+
+HOW TO USE THIS TEMPLATE:
+
+1. Copy this entire data section (Column Headers + Sample Data)
+2. Open Excel / Google Sheets / LibreOffice Calc
+3. Create new spreadsheet
+4. Paste data as Tab-separated
+5. Replace sample data with your actual data
+6. Make sure all REQUIRED columns are filled
+7. Save as .xlsx file
+8. Upload to pins import feature
+
+---
+
+IMPORTANT NOTES:
+
+✓ Replace "https://example.com/post-X" with actual Post URLs from your database
+✓ Do NOT use formulas - keep everything as plain text
+✓ postUrl MUST exactly match Post URL in database or import will fail
+✓ Keep headers in row 1
+✓ Do NOT include row numbers column
+✓ Use Tab or pipe (|) as separator
+✓ Max file size: 10 MB
+✓ Supported formats: .xlsx, .xls
+
+---
+
+STEP-BY-STEP IMPORT PROCESS:
+
+1. Go to Pins Dashboard
+2. Click "Import Excel" button
+3. Select your .xlsx or .xls file
+4. Wait for upload to complete
+5. Check notification for results:
+   - Success: Shows count of imported pins
+   - Error: Shows which rows failed and why
+6. Refresh page to see new pins
+
+---
+
+IF IMPORT FAILS:
+
+1. Check error message carefully
+2. Verify postUrl exists in Posts table
+3. Ensure required fields are not empty
+4. Check file format (.xlsx or .xls)
+5. Verify file is not corrupted
+6. Try with a smaller test file first
+
+---
+
+DUPLICATE DETECTION:
+
+System checks for existing pins with same (postId + title)
+- If duplicate found: PIN is SKIPPED (not imported)
+- Result: Shows "skipped" count in notification
+- You can safely re-import same file multiple times
