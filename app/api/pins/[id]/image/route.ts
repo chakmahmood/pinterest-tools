@@ -1,18 +1,53 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-/**
- * Image upload endpoint for Pins
- * Ready for future implementation of drag & drop image upload
- * Currently prepared with proper structure for production use
- */
-
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
+
+    const formData = await req.formData();
+    const file = formData.get("file");
+
+    if (!(file instanceof File)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "No file provided.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Only image files are allowed.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "File size must be less than 5MB.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
 
     // Verify pin exists
     const pin = await prisma.pin.findUnique({
@@ -31,32 +66,43 @@ export async function POST(
       );
     }
 
-    // TODO: Implement image upload
-    // Steps for future implementation:
-    // 1. Parse FormData from request
-    // 2. Validate file type (image only)
-    // 3. Validate file size (max 5MB for Pinterest)
-    // 4. Upload to storage service (S3, Cloudinary, etc.)
-    // 5. Get image URL
-    // 6. Update pin.imageUrl in database
-    // 7. Return updated pin
+    // Convert file to base64 for storage
+    // In production, you would upload to S3, Cloudinary, or similar service
+    const buffer = await file.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString("base64");
+    const dataUrl = `data:${file.type};base64,${base64}`;
+
+    // Update pin with image URL
+    const updatedPin = await prisma.pin.update({
+      where: { id },
+      data: {
+        imageUrl: dataUrl,
+      },
+      include: {
+        post: true,
+      },
+    });
 
     return NextResponse.json(
       {
-        success: false,
-        message: "Image upload feature is not yet implemented.",
+        success: true,
+        message: "Image uploaded successfully.",
+        data: updatedPin,
       },
       {
-        status: 501,
+        status: 200,
       },
     );
   } catch (error) {
-    console.error(error);
+    console.error("Image upload error:", error);
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to upload image.";
 
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to upload image.",
+        message: errorMessage,
       },
       {
         status: 500,
