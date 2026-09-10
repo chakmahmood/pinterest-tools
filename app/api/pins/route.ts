@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 
 import {
   createPin,
   getPins,
-  getPinById,
 } from "@/features/pins/repositories/pin.repository";
 import { getPosts } from "@/features/posts/repositories/post.repository";
 
@@ -55,7 +53,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validate postId exists
+    // Validate postId
     const postId = body.postId;
 
     if (!postId || typeof postId !== "string") {
@@ -70,8 +68,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const post = await getPosts();
-    const postExists = post.some((p) => p.id === postId);
+    // Check whether post exists
+    const posts = await getPosts();
+    const postExists = posts.some((post) => post.id === postId);
 
     if (!postExists) {
       return NextResponse.json(
@@ -88,6 +87,7 @@ export async function POST(req: Request) {
     // Parse keywords
     const keywords = Array.isArray(body.keywords) ? body.keywords : [];
 
+    // Create pin
     const pin = await createPin({
       postId,
       title: body.title,
