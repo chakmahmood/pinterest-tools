@@ -1,34 +1,11 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 
-interface ExcelRow {
-  "Post URL"?: unknown;
-  Title?: unknown;
-  "Main Keyword"?: unknown;
-  "Annotation Keywords"?: unknown;
-  [key: string]: unknown;
-}
+import { prisma } from "@/lib/prisma";
 
-interface NormalizedRow {
-  postUrl: string;
-  title: string;
-  mainKeyword: string;
-  annotationKeywords: string[];
-}
+export const runtime = "nodejs";
 
-interface PinToCreate {
-  postId: string;
-  title: string;
-  description: string;
-  overlayText: string | null;
-  imagePrompt: string;
-  imageUrl: string | null;
-  board: string | null;
-  keywords: string[];
-}
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
 
@@ -37,18 +14,29 @@ export async function POST(request: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json(
         {
-          success: false,
-          message: "Excel file is required",
+          error: "Excel file is required.",
         },
         { status: 400 },
       );
     }
 
-    if (file.size === 0) {
+    // Check file type
+    const fileName = file.name.toLowerCase();
+
+    if (!fileName.endsWith(".xlsx") && !fileName.endsWith(".xls")) {
       return NextResponse.json(
         {
-          success: false,
-          message: "The uploaded file is empty",
+          error: "Only .xlsx and .xls files are supported.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Limit file size to 10 MB
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json(
+        {
+          error: "File is too large. Maximum size is 10 MB.",
         },
         { status: 400 },
       );
@@ -63,312 +51,139 @@ export async function POST(request: Request) {
     if (workbook.SheetNames.length === 0) {
       return NextResponse.json(
         {
-          success: false,
-          message: "No worksheet found in the Excel file",
+          error: "Excel file does not contain any worksheet.",
         },
         { status: 400 },
       );
     }
 
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
 
-    if (!worksheet) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "The first worksheet could not be read",
-        },
-        { status: 400 },
-      );
-    }
-
-    const rows = XLSX.utils.sheet_to_json<ExcelRow>(worksheet, {
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
       defval: "",
     });
 
     if (rows.length === 0) {
       return NextResponse.json(
         {
-          success: false,
-          message: "The Excel file contains no data",
+          error: "Excel file is empty.",
         },
         { status: 400 },
       );
     }
 
-    /*
-     * Normalize Excel rows
-     */
-    const normalizedRows: NormalizedRow[] = rows
-      .map((row: ExcelRow): NormalizedRow => {
-        const postUrl = String(row["Post URL"] ?? "").trim();
+    // Normalize Excel column names
+    const normalizedRows = rows.map((row, index) => ({
+      rowNumber: index + 2,
 
-        const title = String(row["Title"] ?? "").trim();
+      url: String(row.url ?? row.URL ?? row.Url ?? "").trim(),
 
-        const mainKeyword = String(row["Main Keyword"] ?? "").trim();
+      title: String(row.title ?? row.Title ?? "").trim(),
 
-        const rawAnnotationKeywords = String(
-          row["Annotation Keywords"] ?? "",
-        ).trim();
+      mainKeyword: String(
+        row.mainKeyword ?? row.main_keyword ?? row["Main Keyword"] ?? "",
+      ).trim(),
 
-        const annotationKeywords = rawAnnotationKeywords
-          ? rawAnnotationKeywords
-              .split(/[,;\n|]/)
-              .map((keyword: string) => keyword.trim())
-              .filter(Boolean)
-          : [];
+      annotationKeywords: String(
+        row.annotationKeywords ??
+          row.annotation_keywords ??
+          row["Annotation Keywords"] ??
+          "",
+      ).trim(),
+    }));
 
-        return {
-          postUrl,
-          title,
-          mainKeyword,
-          annotationKeywords,
-        };
-      })
-      .filter(
-        (row: NormalizedRow) => row.postUrl.length > 0 && row.title.length > 0,
-      );
+    // Validate required fields
+    const errors: string[] = [];
 
-    if (normalizedRows.length === 0) {
+    normalizedRows.forEach((row) => {
+      if (!row.url) {
+        errors.push(`Row ${row.rowNumber}: URL is required.`);
+      }
+
+      if (!row.title) {
+        errors.push(`Row ${row.rowNumber}: Title is required.`);
+      }
+    });
+
+    if (errors.length > 0) {
       return NextResponse.json(
         {
-          success: false,
-          message:
-            "No valid rows found. Each row must contain Post URL and Title.",
+          error: "Some rows are invalid.",
+          errors,
         },
         { status: 400 },
       );
     }
 
-    /*
-     * Remove duplicate URLs from the Excel file.
-     *
-     * If the same Post URL appears multiple times,
-     * only the first row is used.
-     */
-    const uniqueRowsMap = new Map<string, NormalizedRow>();
+    // Remove duplicate URLs inside the Excel itself
+    const uniqueRows = new Map<string, (typeof normalizedRows)[number]>();
 
-    normalizedRows.forEach((row: NormalizedRow) => {
-      if (!uniqueRowsMap.has(row.postUrl)) {
-        uniqueRowsMap.set(row.postUrl, row);
+    for (const row of normalizedRows) {
+      if (!uniqueRows.has(row.url)) {
+        uniqueRows.set(row.url, row);
       }
-    });
-
-    const uniqueRows = Array.from(uniqueRowsMap.values());
-
-    /*
-     * Find existing posts.
-     */
-    const existingPosts: Array<{
-      id: string;
-      url: string;
-    }> = await prisma.post.findMany({
-      where: {
-        url: {
-          in: uniqueRows.map((row: NormalizedRow) => row.postUrl),
-        },
-      },
-      select: {
-        id: true,
-        url: true,
-      },
-    });
-
-    /*
-     * This explicit type prevents:
-     *
-     * Parameter 'post' implicitly has an 'any' type.
-     */
-    const existingUrls = new Set<string>(
-      existingPosts.map((post: { id: string; url: string }) => post.url),
-    );
-
-    /*
-     * Create only posts that don't already exist.
-     */
-    const postsToCreate = uniqueRows.filter(
-      (row: NormalizedRow) => !existingUrls.has(row.postUrl),
-    );
-
-    let createdPostsCount = 0;
-
-    if (postsToCreate.length > 0) {
-      await prisma.post.createMany({
-        data: postsToCreate.map((row: NormalizedRow) => ({
-          url: row.postUrl,
-          title: row.title,
-          mainKeyword: row.mainKeyword || null,
-          annotationKeywords: row.annotationKeywords,
-        })),
-        skipDuplicates: true,
-      });
-
-      createdPostsCount = postsToCreate.length;
     }
 
-    /*
-     * Re-fetch all posts so we have their IDs,
-     * including posts that already existed.
-     */
-    const allPosts: Array<{
-      id: string;
-      url: string;
-      title: string;
-      mainKeyword: string | null;
-      annotationKeywords: string[];
-    }> = await prisma.post.findMany({
+    const rowsToCheck = Array.from(uniqueRows.values());
+
+    // Check URLs that already exist in database
+    const existingPosts = await prisma.post.findMany({
       where: {
         url: {
-          in: uniqueRows.map((row: NormalizedRow) => row.postUrl),
+          in: rowsToCheck.map((row) => row.url),
         },
       },
       select: {
-        id: true,
         url: true,
-        title: true,
-        mainKeyword: true,
-        annotationKeywords: true,
       },
     });
 
-    /*
-     * Map URL -> Post ID
-     */
-    const postsByUrl = new Map<string, string>(
-      allPosts.map(
-        (post: {
-          id: string;
-          url: string;
-          title: string;
-          mainKeyword: string | null;
-          annotationKeywords: string[];
-        }) => [post.url, post.id],
-      ),
-    );
+    const existingUrls = new Set(existingPosts.map((post) => post.url));
 
-    /*
-     * Prepare pins.
-     *
-     * Each imported Post gets one initial Pin.
-     */
-    const pinsToCreate: PinToCreate[] = [];
-
-    for (const row of uniqueRows) {
-      const postId = postsByUrl.get(row.postUrl);
-
-      if (!postId) {
-        continue;
-      }
-
-      const descriptionParts = [
-        row.title,
-        row.mainKeyword,
-        ...row.annotationKeywords,
-      ].filter(Boolean);
-
-      const description = descriptionParts.join(". ");
-
-      const imagePrompt = [
-        `Create a high-quality Pinterest image about ${row.title}.`,
-        row.mainKeyword ? `Main topic: ${row.mainKeyword}.` : "",
-        row.annotationKeywords.length > 0
-          ? `Related keywords: ${row.annotationKeywords.join(", ")}.`
-          : "",
-        "Vertical Pinterest format, clean composition, visually appealing, high click-through-rate design.",
-        "Do not include logos, website names, or Pinterest branding.",
-      ]
-        .filter(Boolean)
-        .join(" ");
-
-      pinsToCreate.push({
-        postId,
+    const postsToCreate = rowsToCheck
+      .filter((row) => !existingUrls.has(row.url))
+      .map((row) => ({
+        url: row.url,
         title: row.title,
-        description,
-        overlayText: row.title,
-        imagePrompt,
-        imageUrl: null,
-        board: null,
-        keywords: row.annotationKeywords,
+        mainKeyword: row.mainKeyword || null,
+
+        annotationKeywords: row.annotationKeywords
+          ? row.annotationKeywords
+              .split(",")
+              .map((keyword) => keyword.trim())
+              .filter(Boolean)
+          : [],
+      }));
+
+    if (postsToCreate.length === 0) {
+      return NextResponse.json({
+        success: true,
+        imported: 0,
+        skipped: rowsToCheck.length,
+        total: rows.length,
+        message: "No new posts to import.",
       });
     }
 
-    /*
-     * Prevent duplicate pins.
-     *
-     * A pin is considered duplicate when the same
-     * postId + title already exists.
-     */
-    const existingPins = await prisma.pin.findMany({
-      where: {
-        OR: pinsToCreate.map((pin: PinToCreate) => ({
-          postId: pin.postId,
-          title: pin.title,
-        })),
-      },
-      select: {
-        postId: true,
-        title: true,
-      },
+    const result = await prisma.post.createMany({
+      data: postsToCreate,
+      skipDuplicates: true,
     });
 
-    const existingPinKeys = new Set<string>(
-      existingPins.map(
-        (pin: { postId: string; title: string }) =>
-          `${pin.postId}::${pin.title}`,
-      ),
-    );
-
-    const newPins = pinsToCreate.filter(
-      (pin: PinToCreate) => !existingPinKeys.has(`${pin.postId}::${pin.title}`),
-    );
-
-    let createdPinsCount = 0;
-
-    if (newPins.length > 0) {
-      await prisma.pin.createMany({
-        data: newPins.map((pin: PinToCreate) => ({
-          postId: pin.postId,
-          title: pin.title,
-          description: pin.description,
-          overlayText: pin.overlayText,
-          imagePrompt: pin.imagePrompt,
-          imageUrl: pin.imageUrl,
-          board: pin.board,
-          keywords: pin.keywords,
-        })),
-        skipDuplicates: true,
-      });
-
-      createdPinsCount = newPins.length;
-    }
-
-    /*
-     * Return import summary.
-     */
     return NextResponse.json({
       success: true,
-      message: "Excel import completed successfully",
-      data: {
-        rowsRead: rows.length,
-        validRows: normalizedRows.length,
-        uniquePosts: uniqueRows.length,
-        existingPosts: existingPosts.length,
-        createdPosts: createdPostsCount,
-        pinsPrepared: pinsToCreate.length,
-        existingPins: existingPins.length,
-        createdPins: createdPinsCount,
-      },
+      imported: result.count,
+      skipped: rows.length - result.count,
+      total: rows.length,
+      message: `Successfully imported ${result.count} posts.`,
     });
   } catch (error) {
     console.error("Excel import error:", error);
 
     return NextResponse.json(
       {
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to import Excel file",
+        error: "Failed to import Excel file.",
       },
       { status: 500 },
     );
