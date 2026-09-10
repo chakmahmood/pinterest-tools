@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Post } from "@prisma/client";
 
 import {
   createPin,
@@ -69,8 +70,9 @@ export async function POST(req: Request) {
     }
 
     // Check whether post exists
-    const posts = await getPosts();
-    const postExists = posts.some((post) => post.id === postId);
+    const posts: Post[] = await getPosts();
+
+    const postExists = posts.some((post: Post) => post.id === postId);
 
     if (!postExists) {
       return NextResponse.json(
