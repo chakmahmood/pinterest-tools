@@ -14,38 +14,55 @@ enum PinStatus {
 }
 
 model Post {
-  id                  String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  url                 String   @unique
-  title               String
+  url   String @unique
+  title String
 
-  mainKeyword         String?
-  annotationKeywords  String[]
+  mainKeyword        String?
+  annotationKeywords String[]
 
-  pins                Pin[]
+  pins Pin[]
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Pin {
-  id          String      @id @default(cuid())
+  id String @id @default(cuid())
 
-  postId      String
-  post        Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
 
-  title       String
-  description String      @db.Text
+  // Pinterest SEO fields
 
-  imageUrl    String
-  board       String?
+  title String
 
-  status      PinStatus   @default(DRAFT)
+  description String @db.Text
 
-  exportedAt  DateTime?
+  overlayText String?
 
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  // AI Image generation
+
+  imagePrompt String @db.Text
+
+  imageUrl String?
+
+  // Pinterest organization
+
+  board String?
+
+  keywords String[]
+
+  // Workflow
+
+  status PinStatus @default(DRAFT)
+
+  exportedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
 
   @@index([postId])
   @@index([status])

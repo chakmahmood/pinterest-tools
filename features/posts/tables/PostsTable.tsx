@@ -74,7 +74,7 @@ export default function PostsTable({ data }: Props) {
                   <Badge variant="outline">{post._count.pins}</Badge>
                 </TableCell>
 
-                <TableCell className="text-muted-foreground whitespace-nowrap">
+                <TableCell className="whitespace-nowrap text-muted-foreground">
                   {formatDistanceToNow(new Date(post.updatedAt), {
                     addSuffix: true,
                   })}

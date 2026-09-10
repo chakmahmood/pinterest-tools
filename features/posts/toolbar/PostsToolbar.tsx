@@ -3,6 +3,7 @@
 import { Search } from "lucide-react";
 
 import CreatePostDialog from "../dialogs/CreatePostDialog";
+import ImportExcel from "../components/ImportExcel";
 
 import { Input } from "@/components/ui/input";
 
@@ -21,6 +22,8 @@ export default function PostsToolbar() {
 
           <Input placeholder="Search posts..." className="pl-9" />
         </div>
+
+        <ImportExcel />
 
         <CreatePostDialog />
       </div>
