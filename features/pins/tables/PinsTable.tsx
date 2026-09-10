@@ -48,7 +48,12 @@ export default function PinsTable({ data, posts }: Props) {
         <label htmlFor="post-filter" className="text-sm font-medium">
           Filter by Post:
         </label>
-        <Select value={selectedPostId} onValueChange={setSelectedPostId}>
+        <Select
+          value={selectedPostId || null}
+          onValueChange={(value) => {
+            setSelectedPostId(value ?? "");
+          }}
+        >
           <SelectTrigger className="w-72">
             <SelectValue placeholder="All posts" />
           </SelectTrigger>

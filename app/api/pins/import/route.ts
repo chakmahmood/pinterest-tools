@@ -5,18 +5,6 @@ import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-interface ExcelRow {
-  postUrl?: string;
-  title?: string;
-  description?: string;
-  overlayText?: string;
-  imagePrompt?: string;
-  imageUrl?: string;
-  board?: string;
-  keywords?: string;
-  [key: string]: unknown;
-}
-
 interface NormalizedRow {
   rowNumber: number;
   postUrl: string;
@@ -27,6 +15,17 @@ interface NormalizedRow {
   imageUrl: string;
   board: string;
   keywords: string;
+}
+
+interface PinToCreate {
+  postId: string;
+  title: string;
+  description: string;
+  overlayText: string | null;
+  imagePrompt: string;
+  imageUrl: string | null;
+  board: string | null;
+  keywords: string[];
 }
 
 export async function POST(request: NextRequest) {
@@ -86,7 +85,28 @@ export async function POST(request: NextRequest) {
     }
 
     const sheetName = workbook.SheetNames[0];
+
+    if (!sheetName) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unable to read worksheet.",
+        },
+        { status: 400 },
+      );
+    }
+
     const worksheet = workbook.Sheets[sheetName];
+
+    if (!worksheet) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Unable to read worksheet.",
+        },
+        { status: 400 },
+      );
+    }
 
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
       defval: "",
@@ -102,29 +122,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Normalize Excel column names - handle various case variants
-    const normalizedRows = rows.map((row, index) => ({
-      rowNumber: index + 2,
-      postUrl: String(row.postUrl ?? row.postURL ?? row.post_url ?? "").trim(),
-      title: String(row.title ?? row.Title ?? "").trim(),
-      description: String(row.description ?? row.Description ?? "").trim(),
-      overlayText: String(
-        row.overlayText ?? row.overlay_text ?? row["Overlay Text"] ?? "",
-      ).trim(),
-      imagePrompt: String(
-        row.imagePrompt ?? row.image_prompt ?? row["Image Prompt"] ?? "",
-      ).trim(),
-      imageUrl: String(
-        row.imageUrl ?? row.image_url ?? row["Image URL"] ?? "",
-      ).trim(),
-      board: String(row.board ?? row.Board ?? "").trim(),
-      keywords: String(row.keywords ?? row.Keywords ?? "").trim(),
-    })) as NormalizedRow[];
+    // Normalize Excel column names
+    const normalizedRows: NormalizedRow[] = rows.map(
+      (row: Record<string, unknown>, index: number) => ({
+        rowNumber: index + 2,
+
+        postUrl: String(
+          row.postUrl ?? row.postURL ?? row.post_url ?? row["Post URL"] ?? "",
+        ).trim(),
+
+        title: String(row.title ?? row.Title ?? "").trim(),
+
+        description: String(row.description ?? row.Description ?? "").trim(),
+
+        overlayText: String(
+          row.overlayText ?? row.overlay_text ?? row["Overlay Text"] ?? "",
+        ).trim(),
+
+        imagePrompt: String(
+          row.imagePrompt ?? row.image_prompt ?? row["Image Prompt"] ?? "",
+        ).trim(),
+
+        imageUrl: String(
+          row.imageUrl ?? row.image_url ?? row["Image URL"] ?? "",
+        ).trim(),
+
+        board: String(row.board ?? row.Board ?? "").trim(),
+
+        keywords: String(row.keywords ?? row.Keywords ?? "").trim(),
+      }),
+    );
 
     // Validate required fields
     const errors: string[] = [];
 
-    normalizedRows.forEach((row) => {
+    normalizedRows.forEach((row: NormalizedRow) => {
       if (!row.postUrl) {
         errors.push(`Row ${row.rowNumber}: Post URL is required.`);
       }
@@ -153,7 +185,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Remove duplicate URLs inside the Excel itself
+    // Remove duplicate URLs inside Excel itself
     const uniqueRows = new Map<string, NormalizedRow>();
 
     for (const row of normalizedRows) {
@@ -168,7 +200,7 @@ export async function POST(request: NextRequest) {
     const posts = await prisma.post.findMany({
       where: {
         url: {
-          in: rowsToCheck.map((row) => row.postUrl),
+          in: rowsToCheck.map((row: NormalizedRow) => row.postUrl),
         },
       },
       select: {
@@ -177,10 +209,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const postsByUrl = new Map(posts.map((post) => [post.url, post.id]));
+    // Explicitly type the callback parameter
+    const postsByUrl = new Map<string, string>(
+      posts.map((post: { id: string; url: string }) => [post.url, post.id]),
+    );
 
-    // Validate all posts exist and prepare pins to create
-    const pinsToCreate = [];
+    // Prepare pins to create
+    const pinsToCreate: PinToCreate[] = [];
     const invalidPostUrls: string[] = [];
 
     for (const row of rowsToCheck) {
@@ -190,6 +225,7 @@ export async function POST(request: NextRequest) {
         invalidPostUrls.push(
           `Row ${row.rowNumber}: Post URL not found: ${row.postUrl}`,
         );
+
         continue;
       }
 
@@ -197,7 +233,7 @@ export async function POST(request: NextRequest) {
       const keywords = row.keywords
         ? row.keywords
             .split(",")
-            .map((keyword) => keyword.trim())
+            .map((keyword: string) => keyword.trim())
             .filter(Boolean)
         : [];
 
@@ -224,10 +260,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for existing pins (duplicate detection based on postId + title)
+    // Nothing to check
+    if (pinsToCreate.length === 0) {
+      return NextResponse.json({
+        success: true,
+        imported: 0,
+        skipped: rows.length,
+        total: rows.length,
+        message: "No pins to import.",
+      });
+    }
+
+    // Check existing pins
     const existingPins = await prisma.pin.findMany({
       where: {
-        OR: pinsToCreate.map((pin) => ({
+        OR: pinsToCreate.map((pin: PinToCreate) => ({
           postId: pin.postId,
           title: pin.title,
         })),
@@ -238,12 +285,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const existingSet = new Set(
-      existingPins.map((pin) => `${pin.postId}|${pin.title}`),
+    const existingSet = new Set<string>(
+      existingPins.map(
+        (pin: { postId: string; title: string }) =>
+          `${pin.postId}|${pin.title}`,
+      ),
     );
 
-    const newPins = pinsToCreate.filter(
-      (pin) => !existingSet.has(`${pin.postId}|${pin.title}`),
+    const newPins: PinToCreate[] = pinsToCreate.filter(
+      (pin: PinToCreate) => !existingSet.has(`${pin.postId}|${pin.title}`),
     );
 
     const skipped = pinsToCreate.length - newPins.length;
@@ -271,7 +321,7 @@ export async function POST(request: NextRequest) {
       total: rows.length,
       message: `Successfully imported ${result.count} pins.`,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Excel import error:", error);
 
     const errorMessage =

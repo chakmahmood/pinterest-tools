@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 
 import { pinSchema, type PinFormValues } from "../schemas/pin.schema";
 import type { Post } from "@prisma/client";
@@ -19,11 +20,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+type PinFormInput = z.input<typeof pinSchema>;
+
 interface PinFormProps {
   posts: Post[];
-  defaultValues?: Partial<PinFormValues> & { postId?: string };
+  defaultValues?: Partial<PinFormValues> & {
+    postId?: string;
+  };
   submitLabel?: string;
-  onSubmit: (values: PinFormValues & { postId: string }) => Promise<void>;
+  onSubmit: (
+    values: PinFormValues & {
+      postId: string;
+    },
+  ) => Promise<void>;
   onSuccess?: () => void;
 }
 
@@ -36,8 +45,9 @@ export default function PinForm({
 }: PinFormProps) {
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState("");
-  const [selectedPostId, setSelectedPostId] = useState(
-    defaultValues?.postId || "",
+
+  const [selectedPostId, setSelectedPostId] = useState<string>(
+    defaultValues?.postId ?? "",
   );
 
   const {
@@ -45,7 +55,7 @@ export default function PinForm({
     handleSubmit,
     reset,
     formState: { errors, isDirty },
-  } = useForm<PinFormValues>({
+  } = useForm<PinFormInput, unknown, PinFormValues>({
     resolver: zodResolver(pinSchema),
     defaultValues: {
       title: "",
@@ -61,7 +71,7 @@ export default function PinForm({
 
   function handleFormSubmit(values: PinFormValues) {
     if (!selectedPostId) {
-      setServerError("Please select a post");
+      setServerError("Please select a post.");
       return;
     }
 
@@ -89,21 +99,30 @@ export default function PinForm({
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
+      {/* Server Error */}
       {serverError && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
           {serverError}
         </div>
       )}
 
+      {/* Post */}
       <div className="space-y-2">
         <Label htmlFor="postId">Post *</Label>
 
-        <Select value={selectedPostId} onValueChange={setSelectedPostId}>
+        <Select
+          value={selectedPostId || null}
+          onValueChange={(value) => {
+            setSelectedPostId(value ?? "");
+            setServerError("");
+          }}
+        >
           <SelectTrigger id="postId">
             <SelectValue placeholder="Select a post" />
           </SelectTrigger>
+
           <SelectContent>
-            {posts.map((post) => (
+            {posts.map((post: Post) => (
               <SelectItem key={post.id} value={post.id}>
                 {post.title}
               </SelectItem>
@@ -116,6 +135,7 @@ export default function PinForm({
         )}
       </div>
 
+      {/* Title */}
       <div className="space-y-2">
         <Label htmlFor="title">Title *</Label>
 
@@ -130,6 +150,7 @@ export default function PinForm({
         )}
       </div>
 
+      {/* Description */}
       <div className="space-y-2">
         <Label htmlFor="description">Description *</Label>
 
@@ -148,6 +169,7 @@ export default function PinForm({
         )}
       </div>
 
+      {/* Overlay Text */}
       <div className="space-y-2">
         <Label htmlFor="overlayText">Overlay Text</Label>
 
@@ -164,6 +186,7 @@ export default function PinForm({
         )}
       </div>
 
+      {/* Image Prompt */}
       <div className="space-y-2">
         <Label htmlFor="imagePrompt">Image Prompt *</Label>
 
@@ -182,6 +205,7 @@ export default function PinForm({
         )}
       </div>
 
+      {/* Image URL */}
       <div className="space-y-2">
         <Label htmlFor="imageUrl">Image URL</Label>
 
@@ -200,6 +224,7 @@ export default function PinForm({
         )}
       </div>
 
+      {/* Board */}
       <div className="space-y-2">
         <Label htmlFor="board">Pinterest Board</Label>
 
@@ -214,6 +239,7 @@ export default function PinForm({
         )}
       </div>
 
+      {/* Keywords */}
       <div className="space-y-2">
         <Label htmlFor="keywords">Keywords</Label>
 
@@ -232,6 +258,7 @@ export default function PinForm({
         )}
       </div>
 
+      {/* Submit */}
       <Button
         type="submit"
         className="w-full"
