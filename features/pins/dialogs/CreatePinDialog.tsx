@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import type { PinFormValues } from "../schemas/pin.schema";
-import type { Post } from "../types";
+import type { Post } from "@prisma/client";
 
 import PinForm from "../forms/PinForm";
 

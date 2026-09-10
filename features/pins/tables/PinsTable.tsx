@@ -4,7 +4,7 @@ import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 
 import type { PinWithPost } from "../types";
-import type { Post } from "../types";
+import type { Post } from "@prisma/client";
 
 import PinActions from "../components/PinActions";
 import PinImageTableCell from "../components/PinImageTableCell";
