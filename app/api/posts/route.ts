@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 
 import {
   createPost,
@@ -64,7 +63,7 @@ export async function POST(req: Request) {
 
     const annotationKeywords = parsed.data.annotationKeywords
       .split(",")
-      .map((keyword) => keyword.trim())
+      .map((keyword: string) => keyword.trim())
       .filter(Boolean);
 
     const post = await createPost({
@@ -84,9 +83,18 @@ export async function POST(req: Request) {
       },
     );
   } catch (error) {
-    // Race condition / duplicate URL
+    /*
+     * Race condition / duplicate URL.
+     *
+     * We don't import Prisma from @prisma/client here because
+     * this project uses the newer generated Prisma Client setup.
+     *
+     * Prisma's P2002 error contains code = "P2002".
+     */
     if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
       error.code === "P2002"
     ) {
       return NextResponse.json(
