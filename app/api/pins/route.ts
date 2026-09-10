@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { Post } from "@prisma/client";
 
 import {
   createPin,
@@ -8,6 +7,10 @@ import {
 import { getPosts } from "@/features/posts/repositories/post.repository";
 
 import { pinSchema } from "@/features/pins/schemas/pin.schema";
+
+interface PostForValidation {
+  id: string;
+}
 
 export async function GET() {
   try {
@@ -70,9 +73,11 @@ export async function POST(req: Request) {
     }
 
     // Check whether post exists
-    const posts: Post[] = await getPosts();
+    const posts = (await getPosts()) as PostForValidation[];
 
-    const postExists = posts.some((post: Post) => post.id === postId);
+    const postExists = posts.some(
+      (post: PostForValidation) => post.id === postId,
+    );
 
     if (!postExists) {
       return NextResponse.json(
