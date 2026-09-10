@@ -3,9 +3,11 @@
 import { useState } from "react";
 
 import { MoreHorizontal, Pencil, Trash2, Download } from "lucide-react";
+
 import { toast } from "sonner";
 
-import type { PinWithPost, Post } from "../types";
+import type { PinWithPost } from "../types";
+import type { Post } from "@prisma/client";
 
 import EditPinDialog from "../dialogs/EditPinDialog";
 import DeletePinDialog from "../dialogs/DeletePinDialog";
