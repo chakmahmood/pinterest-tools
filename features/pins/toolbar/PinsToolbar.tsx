@@ -2,7 +2,7 @@
 
 import { Search } from "lucide-react";
 
-import type { Post } from "@prisma/client";
+import type { Post } from "../types";
 
 import CreatePinDialog from "../dialogs/CreatePinDialog";
 import ImportPins from "../components/ImportPins";

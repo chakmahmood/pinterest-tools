@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 import { pinSchema, type PinFormValues } from "../schemas/pin.schema";
-import type { Post } from "@prisma/client";
+import type { Post } from "../types";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 import type { PinWithPost } from "../types";
 import type { PinFormValues } from "../schemas/pin.schema";
-import type { Post } from "@prisma/client";
+import type { Post } from "../types";
 
 import PinForm from "../forms/PinForm";
 
