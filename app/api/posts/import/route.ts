@@ -58,7 +58,26 @@ export async function POST(request: NextRequest) {
     }
 
     const sheetName = workbook.SheetNames[0];
+
+    if (!sheetName) {
+      return NextResponse.json(
+        {
+          error: "First worksheet could not be found.",
+        },
+        { status: 400 },
+      );
+    }
+
     const worksheet = workbook.Sheets[sheetName];
+
+    if (!worksheet) {
+      return NextResponse.json(
+        {
+          error: "First worksheet could not be read.",
+        },
+        { status: 400 },
+      );
+    }
 
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
       defval: "",
@@ -74,29 +93,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Normalize Excel column names
-    const normalizedRows = rows.map((row, index) => ({
-      rowNumber: index + 2,
+    const normalizedRows = rows.map(
+      (row: Record<string, unknown>, index: number) => ({
+        rowNumber: index + 2,
 
-      url: String(row.url ?? row.URL ?? row.Url ?? "").trim(),
+        url: String(row.url ?? row.URL ?? row.Url ?? "").trim(),
 
-      title: String(row.title ?? row.Title ?? "").trim(),
+        title: String(row.title ?? row.Title ?? "").trim(),
 
-      mainKeyword: String(
-        row.mainKeyword ?? row.main_keyword ?? row["Main Keyword"] ?? "",
-      ).trim(),
+        mainKeyword: String(
+          row.mainKeyword ?? row.main_keyword ?? row["Main Keyword"] ?? "",
+        ).trim(),
 
-      annotationKeywords: String(
-        row.annotationKeywords ??
-          row.annotation_keywords ??
-          row["Annotation Keywords"] ??
-          "",
-      ).trim(),
-    }));
+        annotationKeywords: String(
+          row.annotationKeywords ??
+            row.annotation_keywords ??
+            row["Annotation Keywords"] ??
+            "",
+        ).trim(),
+      }),
+    );
 
     // Validate required fields
     const errors: string[] = [];
 
-    normalizedRows.forEach((row) => {
+    normalizedRows.forEach((row: (typeof normalizedRows)[number]) => {
       if (!row.url) {
         errors.push(`Row ${row.rowNumber}: URL is required.`);
       }
@@ -128,10 +149,12 @@ export async function POST(request: NextRequest) {
     const rowsToCheck = Array.from(uniqueRows.values());
 
     // Check URLs that already exist in database
-    const existingPosts = await prisma.post.findMany({
+    const existingPosts: Array<{
+      url: string;
+    }> = await prisma.post.findMany({
       where: {
         url: {
-          in: rowsToCheck.map((row) => row.url),
+          in: rowsToCheck.map((row: (typeof rowsToCheck)[number]) => row.url),
         },
       },
       select: {
@@ -139,11 +162,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const existingUrls = new Set(existingPosts.map((post) => post.url));
+    // Explicit type to prevent implicit any error
+    const existingUrls = new Set<string>(
+      existingPosts.map((post: { url: string }) => post.url),
+    );
 
     const postsToCreate = rowsToCheck
-      .filter((row) => !existingUrls.has(row.url))
-      .map((row) => ({
+      .filter((row: (typeof rowsToCheck)[number]) => !existingUrls.has(row.url))
+      .map((row: (typeof rowsToCheck)[number]) => ({
         url: row.url,
         title: row.title,
         mainKeyword: row.mainKeyword || null,
@@ -151,7 +177,7 @@ export async function POST(request: NextRequest) {
         annotationKeywords: row.annotationKeywords
           ? row.annotationKeywords
               .split(",")
-              .map((keyword) => keyword.trim())
+              .map((keyword: string) => keyword.trim())
               .filter(Boolean)
           : [],
       }));
